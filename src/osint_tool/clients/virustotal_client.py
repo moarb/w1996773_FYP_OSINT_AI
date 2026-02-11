@@ -1,13 +1,21 @@
 import requests
 from typing import Any, Dict
+from osint_tool.config import settings
+
 
 class VirusTotalClient:
     BASE_URL = "https://www.virustotal.com/api/v3"
 
-    def __init__(self, api_key: str):
-        if not api_key:
-            raise ValueError("VirusTotal API key is missing. Set VIRUSTOTAL_API_KEY in .env")
-        self.api_key = api_key
+    def __init__(self, api_key: str | None = None):
+        # If not provided, pull from config
+        self.api_key = api_key or settings.virustotal_api_key
+
+        if not self.api_key:
+            raise ValueError(
+                "VirusTotal API key is missing. "
+                "Set VIRUSTOTAL_API_KEY in .env (local) "
+                "or Streamlit Secrets (cloud)."
+            )
 
     def _headers(self) -> Dict[str, str]:
         return {"x-apikey": self.api_key}
