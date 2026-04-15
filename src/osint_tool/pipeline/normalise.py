@@ -118,3 +118,61 @@ def normalise_virustotal_domain(raw_path: Path, output_dir: Path) -> Path:
         json.dump(normalised, f, indent=2)
 
     return output_path
+
+
+def normalise_shodan_domain(raw_path: Path, output_dir: Path) -> Path:
+    """
+    Takes a raw Shodan domain JSON file and produces a normalised JSON file.
+    """
+
+    with raw_path.open("r", encoding="utf-8") as f:
+        raw: Dict[str, Any] = json.load(f)
+
+    query = raw.get("query")
+    resolved_ip = raw.get("resolved_ip")
+    host = raw.get("host", {}) or {}
+
+    ports = host.get("ports", []) or []
+    vulns = host.get("vulns", {}) or {}
+    tags = host.get("tags", []) or []
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    normalised: Dict[str, Any] = {
+        "meta": {
+            "source": "shodan",
+            "query_type": "domain",
+            "query": query,
+            "collected_at": now_iso,
+            "raw_file": str(raw_path.as_posix()),
+            "tool_version": TOOL_VERSION,
+        },
+        "results": {
+            "resolved_ip": resolved_ip,
+            "open_ports": ports,
+            "open_port_count": len(ports),
+            "vulns_count": len(vulns),
+            "vuln_ids": list(vulns.keys()) if isinstance(vulns, dict) else [],
+            "org": host.get("org"),
+            "isp": host.get("isp"),
+            "country_code": host.get("country_code"),
+            "os": host.get("os"),
+            "tags": tags,
+        },
+        "risk": {
+            "score": None,
+            "level": None,
+            "reasons": [],
+        },
+    }
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_target = (query or "unknown").replace("/", "_")
+    output_path = output_dir / f"{timestamp}__shodan__domain__{safe_target}.json"
+
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(normalised, f, indent=2)
+
+    return output_path

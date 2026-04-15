@@ -1,0 +1,15 @@
+query,vt_reputation,vt_malicious,vt_suspicious,vt_harmless,vt_undetected,shodan_open_port_count,shodan_vulns_count,shodan_has_risky_port,shodan_is_cdn,label
+bbc.co.uk,3,0,0,63,31,2,0,0,1,LOW
+google.com,698,0,0,67,27,2,0,0,0,LOW
+microsoft.com,49,0,0,66,28,0,0,0,0,LOW
+github.com,117,0,0,66,28,3,0,0,0,LOW
+example.com,12,0,0,65,29,11,0,0,1,MEDIUM
+neverssl.com,0,0,0,60,34,0,0,0,0,LOW
+testphp.vulnweb.com,-2,1,0,60,33,0,0,0,0,HIGH
+malwaredomainlist.com,0,0,0,61,33,0,0,0,0,LOW
+scanme.nmap.org,1,0,0,59,35,5,100,0,0,HIGH
+demo.testfire.net,0,0,0,59,35,3,0,0,0,LOW
+zero.webappsecurity.com,0,0,0,59,35,0,0,0,0,LOW
+badssl.com,1,0,0,61,33,0,0,0,0,LOW
+expired.badssl.com,0,0,0,60,34,0,0,0,0,LOW
+self-signed.badssl.com,0,0,0,59,35,0,0,0,0,LOW

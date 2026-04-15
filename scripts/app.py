@@ -1,93 +1,92 @@
 import os
 import sys
-import json
 from pathlib import Path
-
 import streamlit as st
 
-# Ensure Python can import from src if you run via `streamlit run`
 SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from osint_tool.pipeline.collect import collect_from_virustotal
-from osint_tool.pipeline.normalise import normalise_virustotal_domain
-from osint_tool.pipeline.score import score_normalised_domain
-from osint_tool.pipeline.report import generate_markdown_report
+from osint_tool.pipeline.analyse import analyse_domain
 
-st.set_page_config(page_title="AI-Assisted OSINT Tool (Prototype)", layout="centered")
+st.set_page_config(page_title="AI-Assisted OSINT Tool", layout="wide")
 
-st.title("AI-Assisted OSINT Tool (Prototype)")
-st.caption("VirusTotal → normalise → risk scoring → report generation")
+st.title("AI-Assisted OSINT Risk Analysis Tool")
+st.caption("Multi-source prototype using VirusTotal + Shodan, with rule-based scoring and ML-assisted prediction.")
 
-st.markdown("### Run a scan")
+st.info("Current supported query type: domain")
 
-query_type = st.selectbox("Query type", ["Domain"])
-st.caption("Prototype currently supports VirusTotal domain scans only (IPD scope).")
-query = st.text_input("Target (e.g. bbc.co.uk)")
+domain = st.text_input("Enter domain", value="", placeholder="e.g. bbc.co.uk")
 
-run = st.button("Run scan")
-
-def _safe_read_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+run = st.button("Run Analysis")
 
 if run:
-    if not query.strip():
-        st.error("Please enter a target.")
+    query = domain.strip()
+
+    if not query:
+        st.error("Please enter a domain.")
         st.stop()
 
     try:
-        with st.spinner("Collecting OSINT data..."):
-            raw_path = collect_from_virustotal(query_type, query)
+        with st.spinner("Running full analysis pipeline..."):
+            result = analyse_domain(query)
 
-        with st.spinner("Normalising data..."):
-            norm_path = normalise_virustotal_domain(
-                raw_path=Path(raw_path),
-                output_dir=Path("data/normalised"),
-            )
+        rule_level = result["rule_level"]
+        ml_prediction = result["ml_prediction"]
+        agreement = "Yes" if rule_level == ml_prediction else "No"
 
-        with st.spinner("Scoring risk..."):
-            scored_path, risk_obj = score_normalised_domain(Path(norm_path))
+        st.success("Analysis complete.")
 
-        # IMPORTANT: re-load scored file to ensure UI uses the actual saved schema
-        scored_data = _safe_read_json(Path(scored_path))
-        risk_obj = (scored_data.get("risk") or {}) if isinstance(scored_data, dict) else {}
+        st.markdown("## Final Assessment")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Rule-based score", f"{result['rule_score']} / 100")
+        col2.metric("Rule-based level", rule_level)
+        col3.metric("ML prediction", ml_prediction)
+        col4.metric("Rule / ML agreement", agreement)
 
-        with st.spinner("Generating report..."):
-            report_path = generate_markdown_report(Path(scored_path), Path("data/reports"))
+        st.markdown("## Why this result?")
+        for reason in result["reasons"]:
+            st.write(f"- {reason}")
 
-        st.success("Done.")
+        st.markdown("## Source Summary")
 
-        st.markdown("### Result")
+        vt = result["source_summary"]["virustotal"]
+        shodan = result["source_summary"]["shodan"]
 
-        risk_level = risk_obj.get("level") or "N/A"
-        risk_score = risk_obj.get("score")
-        risk_score = 0 if risk_score is None else risk_score
-        reasons = risk_obj.get("reasons") or []
+        col_a, col_b = st.columns(2)
 
-        st.metric("Risk level", str(risk_level))
-        st.metric("Risk score", f"{int(risk_score)} / 100")
+        with col_a:
+            st.markdown("### VirusTotal")
+            st.write(f"**Reputation:** {vt['reputation']}")
+            st.write(f"**Malicious:** {vt['malicious']}")
+            st.write(f"**Suspicious:** {vt['suspicious']}")
+            st.write(f"**Harmless:** {vt['harmless']}")
+            st.write(f"**Undetected:** {vt['undetected']}")
 
-        st.markdown("**Reasons:**")
-        if reasons:
-            for r in reasons:
-                st.write(f"- {r}")
-        else:
-            st.write("- (no reasons recorded)")
+        with col_b:
+            st.markdown("### Shodan")
+            st.write(f"**Resolved IP:** {shodan['resolved_ip']}")
+            st.write(f"**Open port count:** {shodan['open_port_count']}")
+            st.write(f"**Open ports:** {shodan['open_ports']}")
+            st.write(f"**Vulnerability count:** {shodan['vulns_count']}")
+            st.write(f"**Risky port exposed:** {shodan['has_risky_port']}")
+            st.write(f"**CDN detected:** {shodan['is_cdn']}")
 
-        st.markdown("### Files created")
-        st.code(
-            f"Raw: {raw_path}\nNormalised: {norm_path}\nScored: {scored_path}\nReport: {report_path}",
-            language="text",
-        )
+        st.markdown("## Short Summary")
+        st.write(result["summary_text"])
 
-        st.markdown("### Report preview")
+        st.markdown("## Report")
+        st.write(f"**Saved to:** `{result['report_path']}`")
+
         try:
-            report_text = Path(report_path).read_text(encoding="utf-8")
-            st.text_area("Markdown report", report_text, height=260)
+            report_text = Path(result["report_path"]).read_text(encoding="utf-8")
+            st.text_area("Markdown report preview", report_text, height=300)
         except Exception as e:
             st.warning(f"Could not load report preview: {e}")
 
+        st.markdown("## Extracted Features")
+        st.json(result["features"])
+
     except Exception as e:
-        st.error("Something went wrong while running the pipeline.")
+        st.error("Analysis failed.")
         st.exception(e)
