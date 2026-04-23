@@ -9,6 +9,7 @@ def assign_label_from_features(features: Dict[str, Any]) -> str:
     based on VirusTotal and Shodan indicators.
     """
 
+    # Extract relevant values from features
     vt_malicious = int(features.get("vt_malicious", 0) or 0)
     vt_suspicious = int(features.get("vt_suspicious", 0) or 0)
     vt_reputation = int(features.get("vt_reputation", 0) or 0)
@@ -16,11 +17,11 @@ def assign_label_from_features(features: Dict[str, Any]) -> str:
     shodan_open_port_count = int(features.get("shodan_open_port_count", 0) or 0)
     shodan_has_risky_port = int(features.get("shodan_has_risky_port", 0) or 0)
 
-    # HIGH risk indicators
+    # HIGH risk if strong threat indicators are present
     if vt_malicious > 0 or shodan_vulns_count > 0:
         return "HIGH"
 
-    # MEDIUM risk indicators
+    # MEDIUM risk if weaker or indirect indicators are present
     if (
         vt_suspicious > 0
         or vt_reputation < 0
@@ -29,5 +30,5 @@ def assign_label_from_features(features: Dict[str, Any]) -> str:
     ):
         return "MEDIUM"
 
-    # Otherwise LOW
+    # Otherwise classify as LOW risk
     return "LOW"

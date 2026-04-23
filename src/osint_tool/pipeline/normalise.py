@@ -45,12 +45,17 @@ TOOL_VERSION = "0.1"
 
 def _epoch_to_iso(epoch: Optional[int]) -> Optional[str]:
     """Convert Unix epoch seconds to ISO-8601 string (UTC)."""
+
+    # If no timestamp is present, return None
     if epoch is None:
         return None
+
     try:
+        # Convert Unix timestamp into a readable UTC ISO format
         dt = datetime.fromtimestamp(int(epoch), tz=timezone.utc)
         return dt.isoformat()
     except (ValueError, TypeError):
+        # If conversion fails, return None instead of crashing
         return None
 
 
@@ -66,20 +71,25 @@ def normalise_virustotal_domain(raw_path: Path, output_dir: Path) -> Path:
     Returns:
         Path to the new normalised JSON file.
     """
+
+    # Load the raw VirusTotal JSON file
     with raw_path.open("r", encoding="utf-8") as f:
         raw: Dict[str, Any] = json.load(f)
 
+    # Extract the nested sections we care about
     data = raw.get("data", {}) or {}
     attributes = data.get("attributes", {}) or {}
 
-    # VirusTotal fields we care about
-    target = data.get("id")  # domain string
+    # Pull out the key VirusTotal fields needed by the pipeline
+    target = data.get("id")
     stats = attributes.get("last_analysis_stats", {}) or {}
     reputation = attributes.get("reputation")
     last_analysis_epoch = attributes.get("last_analysis_date")
 
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    # Build the normalised VirusTotal structure
+    # This keeps the output consistent and easier to process later
     normalised: Dict[str, Any] = {
         "meta": {
             "source": "virustotal",
@@ -100,7 +110,8 @@ def normalise_virustotal_domain(raw_path: Path, output_dir: Path) -> Path:
                 "timeout": int(stats.get("timeout", 0) or 0),
             },
         },
-        # placeholder for Phase 3 scoring (you fill later)
+        # Risk fields are left empty at this stage
+        # They will be populated later during scoring
         "risk": {
             "score": None,
             "level": None,
@@ -108,12 +119,15 @@ def normalise_virustotal_domain(raw_path: Path, output_dir: Path) -> Path:
         },
     }
 
+    # Ensure the normalised output folder exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Create a timestamped filename for the new normalised file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_target = (target or "unknown").replace("/", "_")
     output_path = output_dir / f"{timestamp}__virustotal__domain__{safe_target}.json"
 
+    # Save the normalised VirusTotal output
     with output_path.open("w", encoding="utf-8") as f:
         json.dump(normalised, f, indent=2)
 
@@ -125,9 +139,11 @@ def normalise_shodan_domain(raw_path: Path, output_dir: Path) -> Path:
     Takes a raw Shodan domain JSON file and produces a normalised JSON file.
     """
 
+    # Load the raw Shodan JSON file
     with raw_path.open("r", encoding="utf-8") as f:
         raw: Dict[str, Any] = json.load(f)
 
+    # Extract the main fields from the raw Shodan structure
     query = raw.get("query")
     resolved_ip = raw.get("resolved_ip")
     host = raw.get("host", {}) or {}
@@ -138,6 +154,8 @@ def normalise_shodan_domain(raw_path: Path, output_dir: Path) -> Path:
 
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    # Build the normalised Shodan structure
+    # This extracts infrastructure exposure indicators into a cleaner schema
     normalised: Dict[str, Any] = {
         "meta": {
             "source": "shodan",
@@ -159,6 +177,7 @@ def normalise_shodan_domain(raw_path: Path, output_dir: Path) -> Path:
             "os": host.get("os"),
             "tags": tags,
         },
+        # Risk fields are left empty here and filled later during scoring
         "risk": {
             "score": None,
             "level": None,
@@ -166,12 +185,15 @@ def normalise_shodan_domain(raw_path: Path, output_dir: Path) -> Path:
         },
     }
 
+    # Ensure the normalised output folder exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Create a timestamped filename for the new normalised file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_target = (query or "unknown").replace("/", "_")
     output_path = output_dir / f"{timestamp}__shodan__domain__{safe_target}.json"
 
+    # Save the normalised Shodan output
     with output_path.open("w", encoding="utf-8") as f:
         json.dump(normalised, f, indent=2)
 
